@@ -1,258 +1,98 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>HELLO</title>
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    body, html {
-      height: 100%;
-      font-family: 'Courier New', monospace;
-      overflow: hidden;
-    }
-    .video-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: linear-gradient(135deg, rgba(255,0,255,0.1) 0%, rgba(0,255,255,0.1) 100%);
-      z-index: -1;
-    }
-    .background-video {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      z-index: -2;
-      opacity: 0.7;
-    }
-    .logo {
-      position: absolute;
-      top: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 1;
-      filter: drop-shadow(0 0 15px #ff00ff) drop-shadow(0 0 30px #00ffff);
-      animation: pulse 2s infinite alternate;
-    }
-    .logo img {
-      height: 180px;
-      object-fit: contain;
-      transition: transform 0.3s ease;
-    }
-    .logo:hover img {
-      transform: scale(1.05) rotate(-5deg);
-    }
-    .container {
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      padding-top: 180px;
-      color: #fff;
-      text-shadow: 0 0 10px #ff00ff;
-      gap: 35px;
-    }
-    .video-preview {
-      width: 560px;
-      max-width: 90vw;
-      height: 315px;
-      border: 3px solid #ff00ff;
-      border-radius: 10px;
-      overflow: hidden;
-      background-color: rgba(0, 0, 0, 0.6);
-      box-shadow: 0 0 20px rgba(255, 0, 255, 0.5),
-                  0 0 40px rgba(0, 255, 255, 0.3),
-                  inset 0 0 15px rgba(255, 0, 255, 0.3);
-      transition: transform 0.3s ease, box-shadow 0.3s ease;
-      position: relative;
-    }
-    .video-preview::before {
-      content: '';
-      position: absolute;
-      top: -5px;
-      left: -5px;
-      right: -5px;
-      bottom: -5px;
-      border: 2px solid #00ffff;
-      border-radius: 12px;
-      z-index: -1;
-      opacity: 0.7;
-      animation: borderGlow 3s infinite alternate;
-    }
-    .video-preview:hover {
-      transform: scale(1.02);
-      box-shadow: 0 0 30px rgba(255, 0, 255, 0.7),
-                  0 0 60px rgba(0, 255, 255, 0.5),
-                  inset 0 0 25px rgba(255, 0, 255, 0.5);
-    }
-    .video-preview video {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-    .get-started-btn {
-      padding: 16px 48px;
-      font-size: 1.3rem;
-      background: linear-gradient(45deg, #ff00ff, #00ffff);
-      color: white;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      font-weight: bold;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      text-decoration: none;
-      display: inline-block;
-      transition: all 0.3s ease;
-      box-shadow: 0 0 10px rgba(255, 0, 255, 0.5),
-                  0 0 20px rgba(0, 255, 255, 0.3);
-      position: relative;
-      overflow: hidden;
-      font-family: 'Courier New', monospace;
-    }
-    .get-started-btn::before {
-      content: '';
-      position: absolute;
-      top: -50%;
-      left: -50%;
-      width: 200%;
-      height: 200%;
-      background: linear-gradient(
-        to bottom right,
-        rgba(255,255,255,0.3) 0%,
-        rgba(255,255,255,0) 60%
-      );
-      transform: rotate(30deg);
-      transition: all 0.3s;
-    }
-    .get-started-btn:hover {
-      background: linear-gradient(45deg, #cc00cc, #00cccc);
-      box-shadow: 0 0 20px rgba(255, 0, 255, 0.8),
-                  0 0 30px rgba(0, 255, 255, 0.6);
-      transform: translateY(-2px);
-    }
-    .get-started-btn:hover::before {
-      left: 100%;
-    }
-    @keyframes pulse {
-      0% {
-        filter: drop-shadow(0 0 15px #ff00ff) drop-shadow(0 0 30px #00ffff);
-      }
-      100% {
-        filter: drop-shadow(0 0 20px #ff00ff) drop-shadow(0 0 40px #00ffff);
-      }
-    }
-    @keyframes borderGlow {
-      0% {
-        box-shadow: 0 0 10px #ff00ff;
-        opacity: 0.5;
-      }
-      100% {
-        box-shadow: 0 0 20px #00ffff;
-        opacity: 0.8;
-      }
-    }
-    .scanlines {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: linear-gradient(
-        rgba(0, 0, 0, 0) 50%, 
-        rgba(0, 0, 0, 0.2) 50%
-      );
-      background-size: 100% 4px;
-      z-index: 0;
-      pointer-events: none;
-    }
-    .corner-decoration {
-      position: fixed;
-      width: 100px;
-      height: 100px;
-      border: 2px solid;
-      border-image: linear-gradient(135deg, #ff00ff, #00ffff) 1;
-      filter: drop-shadow(0 0 5px #ff00ff);
-      z-index: 1;
-    }
-    .top-left {
-      top: 20px;
-      left: 20px;
-      border-right: none;
-      border-bottom: none;
-    }
-    .top-right {
-      top: 20px;
-      right: 20px;
-      border-left: none;
-      border-bottom: none;
-    }
-    .bottom-left {
-      bottom: 20px;
-      left: 20px;
-      border-right: none;
-      border-top: none;
-    }
-    .bottom-right {
-      bottom: 20px;
-      right: 20px;
-      border-left: none;
-      border-top: none;
-    }
-    .grid-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background-image: 
-        linear-gradient(rgba(0, 255, 255, 0.05) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0, 255, 255, 0.05) 1px, transparent 1px);
-      background-size: 20px 20px;
-      z-index: -1;
-      pointer-events: none;
-    }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NEON ARCADE — The Retro Game Vault</title>
+<link rel="icon" type="image/png" href="logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Orbitron:wght@400;500;600;700;800;900&family=VT323&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="s.css">
 </head>
 <body>
 
-  <video autoplay muted loop playsinline class="background-video">
-    <source src="loop.mp4" type="video/mp4" />
-    Your browser does not support HTML5 video.
-  </video>
-  <div class="video-overlay"></div>
-  <div class="grid-overlay"></div>
-  <div class="scanlines"></div>
+  <div class="crt-scanlines"></div>
+  <div class="grain"></div>
+  <div class="vignette"></div>
 
-  <div class="corner-decoration top-left"></div>
-  <div class="corner-decoration top-right"></div>
-  <div class="corner-decoration bottom-left"></div>
-  <div class="corner-decoration bottom-right"></div>
+  <!-- NAV -->
+  <nav class="navbar glass" id="navbar">
+    <a href="#hero" class="nav-brand">
+      <img src="logo.png" alt="Neon Arcade logo">
+      <span>NEON ARCADE</span>
+    </a>
+    <ul class="nav-links">
+      <li><a href="#hero" class="nav-link active" data-target="hero">Home</a></li>
+      <li><a href="#games" class="nav-link" data-target="games">Games</a></li>
+      <li><a href="#about" class="nav-link" data-target="about">About</a></li>
+    </ul>
+  </nav>
 
-  <div class="logo">
-    <img src="logo.png" alt="Neon Retro Logo" />
-  </div>
+  <!-- HERO -->
+  <section class="hero" id="hero">
+    <video class="bg-video" autoplay muted loop playsinline>
+      <source src="loop.mp4" type="video/mp4">
+    </video>
+    <div class="hero-tint"></div>
+    <div class="sun"></div>
+    <div class="grid-floor"></div>
 
-  <div class="container">
-    <div class="video-preview">
-      <video autoplay muted loop playsinline>
-        <source src="SIGNUPVID1.mp4" type="video/mp4" />
-        Your browser does not support HTML5 video.
-      </video>
+    <div class="vhs-hud"><span class="dot"></span> REC <span id="recClock">00:00:00</span></div>
+    <div class="vhs-hud-right">SP · STEREO · <span id="gameCountHud">100</span> TITLES</div>
+
+    <div class="hero-cartridge glass">
+      <img class="hero-logo" src="logo.png" alt="Neon Arcade logo">
+      <div class="hero-eyebrow">Insert Coin</div>
+      <h1 class="hero-title">A SHRINE<br>TO THE GOLDEN AGE</h1>
+      <p class="hero-sub">One hundred games. Pixel legends from the arcade floor to the living room, playable in one tap — no quarters required.</p>
+      <div class="hero-ctas">
+        <a href="#games" class="btn btn-primary">▶ Start Game</a>
+        <a href="#about" class="btn btn-ghost">Credits Reel</a>
+      </div>
+      <div class="hero-screen">
+        <video autoplay muted loop playsinline>
+          <source src="SIGNUPVID1.mp4" type="video/mp4">
+        </video>
+      </div>
     </div>
 
-    <a href="games.html" class="get-started-btn">Get Started</a>
-  </div>
+    <div class="scroll-cue">▼ SCROLL TO BROWSE ▼</div>
+  </section>
 
+  <!-- GAMES -->
+  <section id="games">
+    <div class="section-head reveal">
+      <div class="eyebrow">The Vault</div>
+      <h2 class="section-title">Browse The Collection</h2>
+      <p class="section-desc">Every card is a cartridge. Hover to flip it over, read the label, and press play — or tap on mobile.</p>
+    </div>
+
+    <div class="filter-bar glass reveal" id="filterBar"></div>
+    <p class="result-count" id="resultCount"></p>
+
+    <div class="game-grid" id="gameGrid"></div>
+  </section>
+
+  <!-- ABOUT -->
+  <section id="about">
+    <div class="about-wrap glass reveal">
+      <div class="tape-strip"><div class="tape-reel"></div>ABOUT & CREDITS <div class="tape-reel"></div></div>
+      <h2 class="section-title" style="text-align:center;">Why This Vault Exists</h2>
+      <p class="about-copy">
+        This site is dedicated to keeping the spirit of classic games alive. We've brought together some of the most iconic titles of all time from amazing sources across the web —
+        <strong>huge thanks to the communities who continue preserving retro gaming history.</strong>
+        Whether you're here to rescue princesses, fight aliens, race through pixelated cities, or just vibe with the nostalgia, this curated collection of legendary titles has you covered.
+      </p>
+      <h3 class="credits-title">Sources &amp; Thanks</h3>
+      <div class="credits-grid" id="creditsGrid"></div>
+    </div>
+  </section>
+
+  <footer class="glass">
+    <div class="footer-brand">NEON<span class="grad">ARCADE</span> · A retro game vault</div>
+    <div class="footer-meta">© <span id="year"></span> · since 2024</div>
+  </footer>
+
+<script src="j.js"></script>
 </body>
 </html>
