@@ -46,7 +46,7 @@
       <h1 class="hero-title">A SHRINE<br>TO THE GOLDEN AGE</h1>
       <p class="hero-sub">One hundred games. Pixel legends from the arcade floor to the living room, playable in one tap — no quarters required.</p>
       <div class="hero-ctas">
-        <a href="#games" class="btn btn-primary">▶ Start Game</a>
+        <a href="#scene" class="btn btn-primary" id="btnStartGame">▶ Start Game</a>
         <a href="#about" class="btn btn-ghost">Credits Reel</a>
       </div>
       <div class="hero-screen">
@@ -57,6 +57,23 @@
     </div>
 
     <div class="scroll-cue">▼ SCROLL TO BROWSE ▼</div>
+  </section>
+
+  <!-- 3D SCROLL-SCRUBBED FRAME SEQUENCE -->
+  <section class="scene-wrap" id="scene">
+    <div class="scene-sticky">
+      <canvas id="sceneCanvas" class="scene-canvas"></canvas>
+      <div class="scene-scanlines"></div>
+
+      <!-- Top-Left Title (Disappears at frame 74) -->
+      <div class="scene-caption" id="sceneCaption">
+        <h2 class="scene-title">POWERING UP THE CARTRIDGE</h2>
+      </div>
+
+      <div class="scene-progress"><div class="scene-progress-bar" id="sceneProgressBar"></div></div>
+      <div class="scene-side-status" id="sceneSideStatus"><span class="status-dot"></span><span id="sceneSideText">POWERING UP</span></div>
+      <div class="scene-loading" id="sceneLoading">LOADING FRAMES&hellip;</div>
+    </div>
   </section>
 
   <!-- GAMES -->
