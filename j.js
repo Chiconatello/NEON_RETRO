@@ -87,7 +87,7 @@ const games = [{"cat": "arcade", "img": "pac.png", "title": "Pac-Man (1980)", "d
   renderGames();
 
   // Nav active state on scroll
-  const sections = ['hero','games','about'].map(id => document.getElementById(id));
+  const sections = ['hero','games','about'].map(id => document.getElementById(id)).filter(Boolean);
   const navLinks = document.querySelectorAll('.nav-link');
   const io = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
@@ -126,3 +126,449 @@ const games = [{"cat": "arcade", "img": "pac.png", "title": "Pac-Man (1980)", "d
   window.addEventListener('scroll', () => {
     navbar.style.padding = window.scrollY > 40 ? '10px clamp(18px,4vw,48px)' : '14px clamp(18px,4vw,48px)';
   });
+
+  // ---------- Smart section navigation ----------
+  // Nav/anchor clicks jump quickly through any part of the page that has no
+  // frames to show, but the moment the path actually crosses the frame
+  // sequence (.scene-wrap), that stretch is played at a fixed, constant
+  // pace — 3.3s to cross it fully, faster than the 6s "Start Game" playback,
+  // and scaled down proportionally if only part of it is crossed.
+  (function initSmoothNav(){
+    const FRAME_ZONE_DURATION = 3300; // ms to cross the full frame sequence
+    const QUICK_PX_PER_MS = 3;        // speed for the non-frame filler jumps
+    let navRaf = null;
+    let navScrolling = false;
+
+    function easeInOutCubic(t){
+      return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2;
+    }
+
+    function cancelNavScroll(){
+      if(navScrolling){
+        navScrolling = false;
+        if(navRaf) cancelAnimationFrame(navRaf);
+        navRaf = null;
+        document.documentElement.style.scrollBehavior = '';
+      }
+    }
+
+    // Returns the frame-sequence's scrollable range in document coordinates:
+    // scrollY===zoneStart is frame 0, scrollY===zoneEnd is the last frame.
+    function getFrameZone(){
+      const wrap = document.querySelector('.scene-wrap');
+      if(!wrap) return null;
+      const zoneStart = wrap.getBoundingClientRect().top + window.pageYOffset;
+      const total = wrap.offsetHeight - window.innerHeight;
+      if(total <= 0) return null;
+      return { start: zoneStart, end: zoneStart + total };
+    }
+
+    function runSegments(segments){
+      const htmlEl = document.documentElement;
+      const prevBehavior = htmlEl.style.scrollBehavior;
+      htmlEl.style.scrollBehavior = 'auto';
+      navScrolling = true;
+      let i = 0;
+
+      function finish(){
+        navScrolling = false;
+        navRaf = null;
+        htmlEl.style.scrollBehavior = prevBehavior;
+      }
+
+      function startSegment(){
+        if(!navScrolling) return;
+        if(i >= segments.length){ finish(); return; }
+        const seg = segments[i];
+        const dist = seg.to - seg.from;
+        if(Math.abs(dist) < 1 || seg.duration <= 0){ i++; startSegment(); return; }
+        const startTime = performance.now();
+        function step(now){
+          if(!navScrolling) return;
+          const t = Math.min(1, (now - startTime) / seg.duration);
+          const eased = seg.linear ? t : easeInOutCubic(t);
+          window.scrollTo(0, seg.from + dist * eased);
+          if(t < 1){
+            navRaf = requestAnimationFrame(step);
+          } else {
+            i++;
+            startSegment();
+          }
+        }
+        navRaf = requestAnimationFrame(step);
+      }
+      startSegment();
+    }
+
+    function smoothScrollTo(targetY){
+      // Let a running "Start Game" auto-play yield to a nav click, and vice versa.
+      if(window.__cancelSceneAutoPlay) window.__cancelSceneAutoPlay();
+      cancelNavScroll();
+
+      const startY = window.pageYOffset;
+      if(Math.abs(targetY - startY) < 1) return;
+
+      const zone = getFrameZone();
+      const lo = Math.min(startY, targetY);
+      const hi = Math.max(startY, targetY);
+      const overlapStart = zone ? Math.max(lo, zone.start) : lo;
+      const overlapEnd = zone ? Math.min(hi, zone.end) : lo;
+      const crossesFrames = zone && overlapEnd > overlapStart;
+
+      if(!crossesFrames){
+        // No frames on this path — one quick eased jump straight there.
+        const dur = Math.min(900, Math.max(280, Math.abs(targetY - startY) / QUICK_PX_PER_MS));
+        runSegments([{ from: startY, to: targetY, duration: dur }]);
+        return;
+      }
+
+      const goingDown = targetY > startY;
+      const zoneFrac = (overlapEnd - overlapStart) / (zone.end - zone.start);
+      const zoneDuration = FRAME_ZONE_DURATION * zoneFrac;
+      const segments = [];
+
+      if(goingDown){
+        if(startY < overlapStart){
+          segments.push({ from: startY, to: overlapStart, duration: Math.min(900, Math.max(280, (overlapStart - startY) / QUICK_PX_PER_MS)) });
+        }
+        segments.push({ from: Math.max(startY, overlapStart), to: Math.min(targetY, overlapEnd), duration: zoneDuration, linear: true });
+        if(targetY > overlapEnd){
+          segments.push({ from: overlapEnd, to: targetY, duration: Math.min(900, Math.max(280, (targetY - overlapEnd) / QUICK_PX_PER_MS)) });
+        }
+      } else {
+        if(startY > overlapEnd){
+          segments.push({ from: startY, to: overlapEnd, duration: Math.min(900, Math.max(280, (startY - overlapEnd) / QUICK_PX_PER_MS)) });
+        }
+        segments.push({ from: Math.min(startY, overlapEnd), to: Math.max(targetY, overlapStart), duration: zoneDuration, linear: true });
+        if(targetY < overlapStart){
+          segments.push({ from: overlapStart, to: targetY, duration: Math.min(900, Math.max(280, (overlapStart - targetY) / QUICK_PX_PER_MS)) });
+        }
+      }
+
+      runSegments(segments);
+    }
+
+    // Any manual scroll/keyboard input cancels the animated nav scroll.
+    window.addEventListener('wheel', cancelNavScroll, { passive: true });
+    window.addEventListener('touchmove', cancelNavScroll, { passive: true });
+    window.addEventListener('keydown', (e) => {
+      if(['ArrowDown','ArrowUp','PageDown','PageUp',' '].includes(e.key)) cancelNavScroll();
+    }, { passive: true });
+
+    document.querySelectorAll('a[href^="#"]').forEach(link => {
+      if(link.id === 'btnStartGame') return; // handled separately, frame-tied
+      const id = link.getAttribute('href').slice(1);
+      link.addEventListener('click', (e) => {
+        const target = document.getElementById(id);
+        if(!target) return;
+        e.preventDefault();
+        // Sections use scroll-margin-top:80px to clear the fixed navbar on
+        // native jumps; replicate that offset here since we scroll manually.
+        const targetY = id === 'hero'
+          ? 0
+          : (target.getBoundingClientRect().top + window.pageYOffset - 80);
+        smoothScrollTo(targetY);
+      });
+    });
+
+    // Exposed so the scene sequence's own auto-play can cancel us too.
+    window.__cancelNavScroll = cancelNavScroll;
+  })();
+
+  // ---------- 3D Scroll-Scrubbed Frame Sequence ----------
+  // Drop your sequential render images into a folder named "frames" next
+  // to index.html (e.g. frames/0001.jpg, frames/0002.jpg, ... frames/0120.jpg)
+  // and adjust the five settings below to match your files.
+  (function initSceneSequence(){
+    const FRAME_FOLDER = 'frames/';
+    const FRAME_PREFIX = 'ezgif-frame-';
+    const FRAME_COUNT  = 180;
+    const FRAME_PAD    = 3;
+    const FRAME_EXT    = 'jpg';
+
+    const wrap = document.querySelector('.scene-wrap');
+    const canvas = document.getElementById('sceneCanvas');
+    if(!wrap || !canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    const caption = document.getElementById('sceneCaption');
+    const progressBar = document.getElementById('sceneProgressBar');
+    const loading = document.getElementById('sceneLoading');
+    const btnStartGame = document.getElementById('btnStartGame');
+    const sideStatus = document.getElementById('sceneSideStatus');
+    const sideStatusText = document.getElementById('sceneSideText');
+
+    function frameSrc(i){
+      return `${FRAME_FOLDER}${FRAME_PREFIX}${String(i).padStart(FRAME_PAD,'0')}.${FRAME_EXT}`;
+    }
+
+    const images = new Array(FRAME_COUNT);
+    let loadedCount = 0;
+    let currentFrame = -1;
+    let targetProgress = 0;
+    let currentProgress = 0;
+    let autoPlayRaf = null;
+    let isAutoPlaying = false;
+    let lastScrollY = window.pageYOffset;
+    let scrollDir = null; // 'down' | 'up' | null
+
+    // Get loaded image or nearest available frame to prevent flickering
+    function getLoadedImage(index){
+      const safeIdx = Math.max(0, Math.min(FRAME_COUNT - 1, index));
+      if(images[safeIdx] && images[safeIdx].complete && images[safeIdx].naturalWidth > 0){
+        return images[safeIdx];
+      }
+      for(let d = 1; d < FRAME_COUNT; d++){
+        const p = safeIdx - d;
+        if(p >= 0 && images[p] && images[p].complete && images[p].naturalWidth > 0) return images[p];
+        const n = safeIdx + d;
+        if(n < FRAME_COUNT && images[n] && images[n].complete && images[n].naturalWidth > 0) return images[n];
+      }
+      return null;
+    }
+
+    function drawFrame(index){
+      const img = getLoadedImage(index);
+      if(!img) return;
+      const cw = canvas.width, ch = canvas.height;
+      ctx.clearRect(0, 0, cw, ch);
+      const ir = img.naturalWidth / img.naturalHeight;
+      const cr = cw / ch;
+      let dw, dh, dx, dy;
+      if(ir > cr){ dh = ch; dw = ch * ir; dx = (cw - dw) / 2; dy = 0; }
+      else { dw = cw; dh = cw / ir; dx = 0; dy = (ch - dh) / 2; }
+      ctx.drawImage(img, dx, dy, dw, dh);
+    }
+
+    function resizeCanvas(){
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.round(canvas.clientWidth * dpr);
+      canvas.height = Math.round(canvas.clientHeight * dpr);
+      drawFrame(currentFrame < 0 ? 0 : currentFrame);
+    }
+
+    function preload(){
+      for(let i = 1; i <= FRAME_COUNT; i++){
+        const img = new Image();
+        img.src = frameSrc(i);
+        img.onload = () => {
+          loadedCount++;
+          if(i === 1){ currentFrame = 0; drawFrame(0); }
+          if(loadedCount >= 10 && loading){
+            loading.classList.add('done');
+          }
+        };
+        img.onerror = () => {
+          loadedCount++;
+          if(loadedCount >= 10 && loading){
+            loading.classList.add('done');
+          }
+        };
+        images[i - 1] = img;
+      }
+    }
+
+    // Top-left text only shows while scrolling down, and disappears once frame reaches 74
+    function updateCaptions(frame){
+      if(!caption) return;
+      if(scrollDir === 'up'){
+        // Scrolling back up toward the top — keep it out of the way entirely
+        caption.style.opacity = '0';
+        caption.style.transform = 'translateY(-18px)';
+        caption.style.pointerEvents = 'none';
+        return;
+      }
+      if(frame >= 74){
+        // Completely disappeared once 74 frame is reached
+        caption.style.opacity = '0';
+        caption.style.transform = 'translateY(-18px)';
+        caption.style.pointerEvents = 'none';
+      } else if(frame >= 48){
+        // Smoothly fades out leading up to frame 74
+        const fade = Math.max(0, (74 - frame) / 26);
+        caption.style.opacity = fade.toFixed(3);
+        caption.style.transform = `translateY(${-((1 - fade) * 16).toFixed(1)}px)`;
+        caption.style.pointerEvents = fade > 0.05 ? 'auto' : 'none';
+      } else {
+        caption.style.opacity = '1';
+        caption.style.transform = 'translateY(0)';
+        caption.style.pointerEvents = 'auto';
+      }
+    }
+
+    // Vertical HUD readout on the side: shows POWERING UP while scrolling
+    // down through the sequence, and flips to POWERING DOWN while scrolling
+    // back up toward the top — hidden entirely outside the scene.
+    function updateSideStatus(){
+      if(!sideStatus) return;
+      const inScene = targetProgress > 0.001 && targetProgress < 0.999;
+      if(!inScene){
+        sideStatus.classList.remove('visible');
+        return;
+      }
+      sideStatus.classList.add('visible');
+      if(scrollDir === 'up'){
+        sideStatus.classList.add('powering-down');
+        if(sideStatusText) sideStatusText.textContent = 'POWERING DOWN';
+      } else {
+        sideStatus.classList.remove('powering-down');
+        if(sideStatusText) sideStatusText.textContent = 'POWERING UP';
+      }
+    }
+
+    function updateScrollTarget(){
+      const scrollY = window.pageYOffset;
+      if(scrollY > lastScrollY + 0.5) scrollDir = 'down';
+      else if(scrollY < lastScrollY - 0.5) scrollDir = 'up';
+      lastScrollY = scrollY;
+
+      const rect = wrap.getBoundingClientRect();
+      const total = wrap.offsetHeight - window.innerHeight;
+      if(total > 0){
+        const scrolled = -rect.top;
+        targetProgress = Math.max(0, Math.min(1, scrolled / total));
+      } else {
+        targetProgress = 0;
+      }
+
+      updateSideStatus();
+    }
+
+    // 3D Website Smooth Lerp Loop (Fluid physics)
+    function animLoop(){
+      const diff = targetProgress - currentProgress;
+      if(Math.abs(diff) > 0.0001){
+        currentProgress += diff * 0.14; // Silky responsive lerp
+      } else {
+        currentProgress = targetProgress;
+      }
+
+      const index = Math.min(FRAME_COUNT - 1, Math.max(0, Math.round(currentProgress * (FRAME_COUNT - 1))));
+      if(index !== currentFrame){
+        currentFrame = index;
+        drawFrame(currentFrame);
+      }
+
+      updateCaptions(index);
+
+      if(progressBar){
+        progressBar.style.width = `${(currentProgress * 100).toFixed(2)}%`;
+      }
+
+      requestAnimationFrame(animLoop);
+    }
+
+    // Cancel auto-scroll if user interacts
+    function cancelAutoPlay(){
+      if(isAutoPlaying){
+        isAutoPlaying = false;
+        if(autoPlayRaf) cancelAnimationFrame(autoPlayRaf);
+        autoPlayRaf = null;
+        document.documentElement.style.scrollBehavior = '';
+      }
+    }
+    window.__cancelSceneAutoPlay = cancelAutoPlay;
+
+    // Smoothly play the 180-frame animation across ~6 seconds, then continue
+    // straight on into the Games section instead of parking on the last frame.
+    function playSceneVideo(durationMs = 6000){
+      if(window.__cancelNavScroll) window.__cancelNavScroll();
+      cancelAutoPlay();
+
+      const sceneStart = wrap.getBoundingClientRect().top + window.pageYOffset;
+      const trackDistance = wrap.offsetHeight - window.innerHeight;
+      const htmlEl = document.documentElement;
+      const prevScrollBehavior = htmlEl.style.scrollBehavior;
+
+      // Scroll smoothly to start of the scene
+      window.scrollTo({ top: sceneStart, behavior: 'smooth' });
+
+      // Begin continuous video scroll
+      setTimeout(() => {
+        // The CSS "scroll-behavior: smooth" rule fights our own per-frame
+        // scrollTo calls below, turning them into laggy queued animations.
+        // Switch to instant scrolling for the duration of the auto-play.
+        htmlEl.style.scrollBehavior = 'auto';
+
+        isAutoPlaying = true;
+        const startTime = performance.now();
+
+        function step(now){
+          if(!isAutoPlaying) return;
+          const elapsed = now - startTime;
+          const t = Math.min(1, elapsed / durationMs);
+
+          // Linear progression matching video playback speed
+          const currentY = sceneStart + (t * trackDistance);
+          window.scrollTo(0, currentY);
+
+          if(t < 1){
+            autoPlayRaf = requestAnimationFrame(step);
+          } else {
+            continueIntoGames(sceneStart + trackDistance);
+          }
+        }
+
+        autoPlayRaf = requestAnimationFrame(step);
+      }, 400);
+
+      // After the frame sequence finishes, keep going (quickly) so the user
+      // actually lands in the Games section rather than stopping mid-scene.
+      function continueIntoGames(finishY){
+        const gamesEl = document.getElementById('games');
+        if(!gamesEl){
+          isAutoPlaying = false;
+          autoPlayRaf = null;
+          htmlEl.style.scrollBehavior = prevScrollBehavior;
+          return;
+        }
+        const targetY = gamesEl.getBoundingClientRect().top + window.pageYOffset - 80;
+        const dist = targetY - finishY;
+        if(Math.abs(dist) < 1){
+          isAutoPlaying = false;
+          autoPlayRaf = null;
+          htmlEl.style.scrollBehavior = prevScrollBehavior;
+          return;
+        }
+        const dur = Math.min(900, Math.max(280, Math.abs(dist) / 3));
+        const startTime = performance.now();
+        function step(now){
+          if(!isAutoPlaying) return;
+          const t = Math.min(1, (now - startTime) / dur);
+          const eased = t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2;
+          window.scrollTo(0, finishY + dist * eased);
+          if(t < 1){
+            autoPlayRaf = requestAnimationFrame(step);
+          } else {
+            isAutoPlaying = false;
+            autoPlayRaf = null;
+            htmlEl.style.scrollBehavior = prevScrollBehavior;
+          }
+        }
+        autoPlayRaf = requestAnimationFrame(step);
+      }
+    }
+
+    if(btnStartGame){
+      btnStartGame.addEventListener('click', (e) => {
+        e.preventDefault();
+        playSceneVideo(6000);
+      });
+    }
+
+    window.addEventListener('wheel', cancelAutoPlay, { passive: true });
+    window.addEventListener('touchmove', cancelAutoPlay, { passive: true });
+    window.addEventListener('keydown', (e) => {
+      if(['ArrowDown','ArrowUp','PageDown','PageUp',' '].includes(e.key)){
+        cancelAutoPlay();
+      }
+    }, { passive: true });
+
+    window.addEventListener('scroll', updateScrollTarget, { passive: true });
+    window.addEventListener('resize', resizeCanvas);
+
+    preload();
+    resizeCanvas();
+    updateScrollTarget();
+    requestAnimationFrame(animLoop);
+  })();
